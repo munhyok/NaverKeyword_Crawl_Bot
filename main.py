@@ -53,7 +53,7 @@ url = 'https://search.shopping.naver.com/best/category/keyword?categoryCategoryI
 
 options = webdriver.ChromeOptions()
 #options.add_experimental_option('excludeSwitches', ['enable-logging'])
-options.add_argument("headless")
+#options.add_argument("headless")
 #driver = webdriver.Chrome(executable_path='./chromedriver', options=options)
 
     
@@ -275,11 +275,74 @@ def searchKeyword():
     activeLabel('키워드 수집 성공')
     
 
+def relationKeyword():
+    searchRes = textBox.get()
+    print(searchRes)
+    if searchRes == '':
+        messagebox.showwarning('키워드가 없습니다','키워드를 입력해주세요!')
+    else:
+        driver = webdriver.Chrome(executable_path='./chromedriver', options=options)
+
+        driver.get('https://search.shopping.naver.com/search/all?query='+searchRes+'&catId=50000151')
+        titleList=[]
+        naverSearchList=[]
+
+        
+        
+        req = driver.page_source
+        soup = BeautifulSoup(req, 'html.parser')
+        
+        titles = soup.select('div.relatedTags_relation_srh__1CleC ul li') 
+
+        num = 1
+        for title in titles:
+            printTitle = title.get_text()
+                    
+                
+            titleList.append(printTitle)
+            num = num + 1
+            
+        print()    
+        print(titleList) 
+        
+        driver.get('https://search.naver.com/search.naver?sm=tab_hty.top&where=nexearch&query='+searchRes)
+        req = driver.page_source
+        soup = BeautifulSoup(req, 'html.parser')
+        
+        releateKey = soup.select('a.keyword')
+        
+        for releate in releateKey:
+            printReleate = releate.get_text()
+            
+            naverSearchList.append(printReleate)
+        
+        print(naverSearchList)
+        
+         
+
+        dic = {'네이버쇼핑 연관':titleList,'네이버검색 연관':naverSearchList}
+        df = pd.DataFrame.from_dict(dic, orient='index')
+    
+        #df.index = df.index+1
+        df = df.transpose()
+        
+        if not os.path.exists('./'+'연관'+searchRes+nowDate+'.xlsx'):
+            with pd.ExcelWriter('./'+'연관'+searchRes+nowDate+'.xlsx', mode='w', engine='openpyxl') as writer:
+                df.to_excel(writer, header=True, index= True, sheet_name=searchRes,index_label='번호')
+        else:
+            with pd.ExcelWriter('./'+'연관'+searchRes+nowDate+'.xlsx', mode='a', engine='openpyxl') as writer:
+                df.to_excel(writer, header=True, index= True, sheet_name=searchRes,index_label='번호')
+        
+    
+        driver.quit()
+    activeLabel('키워드 수집 성공')
+    
+
 
 window = tkinter.Tk()
     
 window.title('트렌드 키워드 순위 검색기')
-window.geometry('300x150+200+100')
+window.geometry('300x200+200+100')
 window.resizable(False,False)
 pTitle = Label(window, text = '트렌드 키워드 순위 검색기')
 
@@ -289,7 +352,7 @@ pProgress = Label(window, text= "버전 1.0")
     
 initBtn = Button(window, text='트렌드 키워드 데이터 수집', command=crawlKeyword)
 searchBtn = Button(window, text='사용자 지정\n키워드 수집', command=searchKeyword, width=10, height=3)
-   
+releateBtn = Button(window, text='연관 키워드\n수집', command=relationKeyword, width = 10, height=3)
     
     
     
@@ -297,7 +360,9 @@ pTitle.pack()
 initBtn.pack(side='top')
 pProgress.pack(side='top')
 textBox.pack(side='left', padx=2)
+releateBtn.pack(padx=2)
 searchBtn.pack(side='right',padx=2)
+
 
 
 
