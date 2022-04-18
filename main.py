@@ -1,8 +1,8 @@
 from distutils import command
 from html.parser import HTMLParser
-from xml.etree.ElementTree import tostring
 
 import os, sys
+from unicodedata import category
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -17,7 +17,7 @@ import time
 
 import tkinter
 from tkinter import *
-import tkinter.ttk
+import tkinter.ttk as ttk
 from tkinter import messagebox
 
 import pandas as pd
@@ -46,10 +46,15 @@ titleList = []
 shopList = []
 trendList = []
 pageList = []
+
+keywordList = ['노트북', '반려동물', '자동차용품', '청소용품']
+
+global comboList
 wb = Workbook()
 
 
-url = 'https://search.shopping.naver.com/best/category/keyword?categoryCategoryId=50000151&categoryChildCategoryId=&categoryDemo=A00&categoryMidCategoryId=50000151&categoryRootCategoryId=50000003&chartRank=1&period=P7D'
+url = ''
+cateNum = ''
 
 options = webdriver.ChromeOptions()
 #options.add_experimental_option('excludeSwitches', ['enable-logging'])
@@ -99,6 +104,26 @@ def doScrollDown(whileSeconds, driver):
         
         
 
+def comboFunc(readVal):
+    
+    if readVal == '노트북':
+        url = 'https://search.shopping.naver.com/best/category/keyword?categoryCategoryId=50000151&categoryChildCategoryId=&categoryDemo=A00&categoryMidCategoryId=50000151&categoryRootCategoryId=50000003&chartRank=1&period=P7D'
+        cateNum = '50000151'
+        return url, cateNum
+    elif readVal == '반려동물':
+        url = 'https://search.shopping.naver.com/best/category/keyword?categoryCategoryId=50000155&categoryChildCategoryId=&categoryDemo=A00&categoryMidCategoryId=50000155&categoryRootCategoryId=50000008&chartRank=1&period=P7D'
+        cateNum = '50000155'
+        return url, cateNum
+    elif readVal == '자동차용품':
+        url = 'https://search.shopping.naver.com/best/category/keyword?categoryCategoryId=50000055&categoryChildCategoryId=&categoryDemo=A00&categoryMidCategoryId=50000055&categoryRootCategoryId=50000008&chartRank=1&period=P7D'
+        cateNum = '50000055'
+        return url, cateNum
+    elif readVal == '청소용품':
+        url = 'https://search.shopping.naver.com/best/category/keyword?categoryCategoryId=50000077&categoryChildCategoryId=&categoryDemo=A00&categoryMidCategoryId=50000077&categoryRootCategoryId=50000008&chartRank=1&period=P7D'
+        cateNum = '50000077'
+    else: pass
+    
+    
     
 
 
@@ -112,8 +137,14 @@ def crawlKeyword():
     nameCount = 1
     priceCount = 1
     trendList = []
+    cateNum = ''
     driver = webdriver.Chrome(executable_path='./chromedriver', options=options)
 
+    readCombo = comboList.get()
+    print(readCombo)
+    
+    url, cateNum = comboFunc(readCombo)
+    
     # driver.implicitly_wait(3)
     # url에 접근한다.
     driver.get(url)
@@ -169,7 +200,7 @@ def crawlKeyword():
     #wb.close()
     
     for i in range(len(trendList)):
-        driver.get('https://search.shopping.naver.com/search/all?query='+trendList[i]+'&catId=50000151')
+        driver.get('https://search.shopping.naver.com/search/all?query='+trendList[i]+'&catId='+cateNum)
         titleList=[]
         shopList=[]
         pageList=[]
@@ -206,11 +237,11 @@ def crawlKeyword():
         df = pd.DataFrame(list_of_tuples, columns=['페이지---순위---제품명','쇼핑몰이름'])
         df.index = df.index+1
         
-        if not os.path.exists('./'+nowDate+'.xlsx'):
-            with pd.ExcelWriter('./'+nowDate+'.xlsx', mode='w', engine='openpyxl') as writer:
+        if not os.path.exists('./'+readCombo+nowDate+'.xlsx'):
+            with pd.ExcelWriter('./'+readCombo+nowDate+'.xlsx', mode='w', engine='openpyxl') as writer:
                 df.to_excel(writer, header=True, index= True, sheet_name=trendList[i],index_label='순위')
         else:
-            with pd.ExcelWriter('./'+nowDate+'.xlsx', mode='a', engine='openpyxl') as writer:
+            with pd.ExcelWriter('./'+readCombo+nowDate+'.xlsx', mode='a', engine='openpyxl') as writer:
                 df.to_excel(writer, header=True, index= True, sheet_name=trendList[i],index_label='순위')
         
     
@@ -219,6 +250,11 @@ def crawlKeyword():
 
 def searchKeyword():
     
+    readCombo = comboList.get()
+    
+    
+    url, cateNum = comboFunc(readCombo)
+    
     searchRes = textBox.get()
     print(searchRes)
     if searchRes == '':
@@ -226,7 +262,7 @@ def searchKeyword():
     else:
         driver = webdriver.Chrome(executable_path='./chromedriver', options=options)
 
-        driver.get('https://search.shopping.naver.com/search/all?query='+searchRes+'&catId=50000151')
+        driver.get('https://search.shopping.naver.com/search/all?query='+searchRes+'&catId='+cateNum)
         titleList=[]
         shopList=[]
         pageList=[]
@@ -276,6 +312,12 @@ def searchKeyword():
     
 
 def relationKeyword():
+    
+    readCombo = comboList.get()
+    
+    
+    url, cateNum = comboFunc(readCombo)
+    
     searchRes = textBox.get()
     print(searchRes)
     if searchRes == '':
@@ -283,7 +325,7 @@ def relationKeyword():
     else:
         driver = webdriver.Chrome(executable_path='./chromedriver', options=options)
 
-        driver.get('https://search.shopping.naver.com/search/all?query='+searchRes+'&catId=50000151')
+        driver.get('https://search.shopping.naver.com/search/all?query='+searchRes+'&catId='+cateNum)
         titleList=[]
         naverSearchList=[]
 
@@ -313,8 +355,8 @@ def relationKeyword():
         
         for releate in releateKey:
             printReleate = releate.get_text()
-            
-            naverSearchList.append(printReleate)
+            filterKeyword = printReleate.replace(' ','')
+            naverSearchList.append(filterKeyword)
         
         print(naverSearchList)
         
@@ -326,11 +368,11 @@ def relationKeyword():
         #df.index = df.index+1
         df = df.transpose()
         
-        if not os.path.exists('./'+'연관'+searchRes+nowDate+'.xlsx'):
-            with pd.ExcelWriter('./'+'연관'+searchRes+nowDate+'.xlsx', mode='w', engine='openpyxl') as writer:
+        if not os.path.exists('./'+'연관)'+searchRes+nowDate+'.xlsx'):
+            with pd.ExcelWriter('./'+'연관)'+searchRes+nowDate+'.xlsx', mode='w', engine='openpyxl') as writer:
                 df.to_excel(writer, header=True, index= True, sheet_name=searchRes,index_label='번호')
         else:
-            with pd.ExcelWriter('./'+'연관'+searchRes+nowDate+'.xlsx', mode='a', engine='openpyxl') as writer:
+            with pd.ExcelWriter('./'+'연관)'+searchRes+nowDate+'.xlsx', mode='a', engine='openpyxl') as writer:
                 df.to_excel(writer, header=True, index= True, sheet_name=searchRes,index_label='번호')
         
     
@@ -342,26 +384,29 @@ def relationKeyword():
 window = tkinter.Tk()
     
 window.title('트렌드 키워드 순위 검색기')
-window.geometry('300x200+200+100')
+window.geometry('300x300+300+200')
 window.resizable(False,False)
 pTitle = Label(window, text = '트렌드 키워드 순위 검색기')
 
 textBox = Entry(window, width= 20)
     
-pProgress = Label(window, text= "버전 1.0")
+pProgress = Label(window, text= "버전 1.3")
     
-initBtn = Button(window, text='트렌드 키워드 데이터 수집', command=crawlKeyword)
+initBtn = Button(window, text='트렌드 키워드 전체 데이터 수집', command=crawlKeyword)
 searchBtn = Button(window, text='사용자 지정\n키워드 수집', command=searchKeyword, width=10, height=3)
 releateBtn = Button(window, text='연관 키워드\n수집', command=relationKeyword, width = 10, height=3)
-    
-    
+comboList = ttk.Combobox(window, height=5, values=keywordList, state="readonly")
+comboList.current(0)
     
 pTitle.pack()
+comboList.pack()
 initBtn.pack(side='top')
-pProgress.pack(side='top')
-textBox.pack(side='left', padx=2)
+
+textBox.pack(padx=2, pady=10)
 releateBtn.pack(padx=2)
-searchBtn.pack(side='right',padx=2)
+searchBtn.pack(padx=2)
+
+pProgress.pack(side='top', pady=3)
 
 
 
