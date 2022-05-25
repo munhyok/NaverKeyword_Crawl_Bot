@@ -2,14 +2,15 @@ from distutils import command
 from html.parser import HTMLParser
 
 import os, sys
-from unicodedata import category
 import requests
 from bs4 import BeautifulSoup
+import selenium
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
 from datetime import date
 from datetime import datetime
 import datetime
@@ -28,7 +29,8 @@ from openpyxl.styles.differential import DifferentialStyle
 from openpyxl.formatting.rule import Rule
 
 import platform
-import pyshorteners
+#import pyshorteners
+#from pyshorteners import Shortener
 
 
 nameCount = 1
@@ -47,7 +49,7 @@ shopList = []
 trendList = []
 pageList = []
 
-keywordList = ['노트북', '반려동물', '자동차용품', '청소용품']
+keywordList = ['노트북', '반려동물', '자동차용품', '청소용품', '패션의류-전체','패션의류-여성의류','패션의류-남성의류']
 
 global comboList
 wb = Workbook()
@@ -80,7 +82,7 @@ def scanPlatform():
 def filtering_string(value, index):
   
     
-    stringValue = value.replace(str(index)+'위','').replace('유지','').replace('상품','').replace('펼치기','').replace('상품접기','').replace('상승','').replace('하락','').replace('접기','')
+    stringValue = value.replace(str(index)+'위','').replace('유지','').replace('상품','').replace('펼치기','').replace('상품접기','').replace('상승','').replace('하락','').replace('접기','').replace('NEW','')
    
     return stringValue
    
@@ -93,7 +95,7 @@ def doScrollDown(whileSeconds, driver):
     
     element = driver.find_element_by_tag_name('html')
     
-    for i in range(800):
+    for i in range(350):
         element.send_keys(Keys.ARROW_DOWN)
     
     #while True:
@@ -121,7 +123,21 @@ def comboFunc(readVal):
     elif readVal == '청소용품':
         url = 'https://search.shopping.naver.com/best/category/keyword?categoryCategoryId=50000077&categoryChildCategoryId=&categoryDemo=A00&categoryMidCategoryId=50000077&categoryRootCategoryId=50000008&chartRank=1&period=P7D'
         cateNum = '50000077'
+        return url, cateNum
+    elif readVal == '패션의류-전체':
+        url = 'https://search.shopping.naver.com/best/category/keyword?categoryCategoryId=50000000&categoryDemo=A00&categoryRootCategoryId=50000000&chartRank=1&period=P7D'
+        cateNum = '50000000'
+        return url, cateNum
+    elif readVal == '패션의류-여성의류':
+        url = 'https://search.shopping.naver.com/best/category/keyword?categoryCategoryId=50000167&categoryChildCategoryId=&categoryDemo=A00&categoryMidCategoryId=50000167&categoryRootCategoryId=50000000&chartRank=1&period=P7D'
+        cateNum = '50000167'
+        return url, cateNum
+    elif readVal == '패션의류-남성의류':
+        url = 'https://search.shopping.naver.com/best/category/keyword?categoryCategoryId=50000169&categoryChildCategoryId=&categoryDemo=A00&categoryMidCategoryId=50000169&categoryRootCategoryId=50000000&chartRank=1&period=P7D'
+        cateNum = '50000169'
+        return url, cateNum
     else: pass
+    
     
     
     
@@ -138,7 +154,7 @@ def crawlKeyword():
     priceCount = 1
     trendList = []
     cateNum = ''
-    driver = webdriver.Chrome(executable_path='./chromedriver', options=options)
+    driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
 
     readCombo = comboList.get()
     print(readCombo)
@@ -162,7 +178,8 @@ def crawlKeyword():
     
     #lowPrices = soup.select('div.imageProduct_price__3vXjm') #최저가
     
-
+    #urlShort = Shortener()
+    #instance = urlShort.tinyurl
 
     print('트렌드 키워드 순위')
 
@@ -186,25 +203,24 @@ def crawlKeyword():
     print(trendList)
     
     activeLabel('키워드 수집 성공')
+    
 
     
-    #dest_filename = str(nowDate)
     
-    
-    #for i in range(len(trendList)):
-        
-        #wb.create_sheet(trendList[i])
-        
-        
-    #wb.save(dest_filename+'.xlsx')
-    #wb.close()
     
     for i in range(len(trendList)):
         driver.get('https://search.shopping.naver.com/search/all?query='+trendList[i]+'&catId='+cateNum)
         titleList=[]
         shopList=[]
-        pageList=[]
-        for pageNum in range(1, 11):
+        hyperlinkList = []
+        changeHyperList = []
+        req = driver.page_source
+        soup = BeautifulSoup(req, 'html.parser')
+        numberList = soup.select('a.pagination_btn_page__FuJaU')
+        print('numnum '+ str(len(numberList)))
+        
+        
+        for pageNum in range(1, len(numberList)+2):
             doScrollDown(2, driver)
         
             req = driver.page_source
@@ -212,7 +228,7 @@ def crawlKeyword():
         
             titles = soup.select('div.basicList_title__3P9Q7') #제품 이름 출력
             shopLink = soup.select('div.basicList_mall_title__3MWFY') #쇼핑 링크
-
+            shopHyperlink = soup.select('a.basicList_link__1MaTN')
             num = 1
             for title in titles:
                 printTitle = title.get_text()
@@ -229,10 +245,21 @@ def crawlKeyword():
                 printShop = shopName.get_text()
             
                 shopList.append(printShop)
+                
+            for hyperlink in shopHyperlink:
+                printLink = hyperlink['href']
+                #print(printLink)
+                hyperlinkList.append(printLink)
+                
             
             
-            driver.find_element_by_css_selector('#__next > div > div.style_container__1YjHN > div.style_inner__18zZX > div.style_content_wrap__1PzEo > div.style_content__2T20F > div.pagination_pagination__6AcG4 > a.pagination_next__1ITTf').click()
+            if len(numberList) == 0:
+                pass
+            else: driver.find_element_by_css_selector('#__next > div > div.style_container__1YjHN > div.style_inner__18zZX > div.style_content_wrap__1PzEo > div.style_content__2T20F > div.pagination_pagination__6AcG4 > a.pagination_next__1ITTf').click()
             
+        #for j in range (len(hyperlinkList)):
+        #        changeHyperList.append('=HYPERLINK("{}", "{}")'.format(instance.short(str(hyperlinkList[j])), "바로가기"))
+                
         list_of_tuples = list(zip(titleList,shopList))
         df = pd.DataFrame(list_of_tuples, columns=['페이지---순위---제품명','쇼핑몰이름'])
         df.index = df.index+1
@@ -246,10 +273,13 @@ def crawlKeyword():
         
     
     driver.quit()
+    messagebox.showinfo('트랜드 키워드', '데이터수집이 완료되었습니다 엑셀을 확인해주세요')
 
 
 def searchKeyword():
     
+    #urlShort = Shortener()
+    #instance = urlShort.tinyurl
     readCombo = comboList.get()
     
     
@@ -259,14 +289,24 @@ def searchKeyword():
     print(searchRes)
     if searchRes == '':
         messagebox.showwarning('키워드가 없습니다','키워드를 입력해주세요!')
+        activeLabel('키워드를 입력해주세요')
     else:
-        driver = webdriver.Chrome(executable_path='./chromedriver', options=options)
+        driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
 
         driver.get('https://search.shopping.naver.com/search/all?query='+searchRes+'&catId='+cateNum)
         titleList=[]
         shopList=[]
         pageList=[]
-        for pageNum in range(1, 11):
+        hyperlinkList = []
+        changeHyperList = []
+        
+        req = driver.page_source
+        soup = BeautifulSoup(req, 'html.parser')
+        numberList = soup.select('a.pagination_btn_page__FuJaU')
+        print('numnum '+ str(len(numberList)))
+
+        
+        for pageNum in range(1, len(numberList)+2):
             doScrollDown(2, driver)
         
             req = driver.page_source
@@ -274,7 +314,7 @@ def searchKeyword():
         
             titles = soup.select('div.basicList_title__3P9Q7') #제품 이름 출력
             shopLink = soup.select('div.basicList_mall_title__3MWFY') #쇼핑 링크
-
+            shopHyperlink = soup.select('a.imageProduct_link_item__2i1IN')
             num = 1
             for title in titles:
                 printTitle = title.get_text()
@@ -291,10 +331,23 @@ def searchKeyword():
                 printShop = shopName.get_text()
         
                 shopList.append(printShop)
+                
+            for hyperlink in shopHyperlink:
+                printLink = hyperlink['href']
+                
+                #print(printLink)
+                hyperlinkList.append(printLink)
+                
             
             
-            driver.find_element_by_css_selector('#__next > div > div.style_container__1YjHN > div.style_inner__18zZX > div.style_content_wrap__1PzEo > div.style_content__2T20F > div.pagination_pagination__6AcG4 > a.pagination_next__1ITTf').click()
+            if len(numberList) == 0:
+                pass
+            else: driver.find_element_by_css_selector('#__next > div > div.style_container__1YjHN > div.style_inner__18zZX > div.style_content_wrap__1PzEo > div.style_content__2T20F > div.pagination_pagination__6AcG4 > a.pagination_next__1ITTf').click()
             
+            
+        #for j in range (len(hyperlinkList)):
+        #        changeHyperList.append('=HYPERLINK("{}", "{}")'.format(instance.short(str(hyperlinkList[j])), "바로가기"))
+                
         list_of_tuples = list(zip(titleList,shopList))
         df = pd.DataFrame(list_of_tuples, columns=['페이지---순위---제품명','쇼핑몰이름'])
         df.index = df.index+1
@@ -308,7 +361,8 @@ def searchKeyword():
         
     
         driver.quit()
-    activeLabel('키워드 수집 성공')
+        activeLabel('키워드 수집 성공')
+        messagebox.showinfo('사용자 지정키워드', '데이터수집이 완료되었습니다 엑셀을 확인해주세요')
     
 
 def relationKeyword():
@@ -322,8 +376,9 @@ def relationKeyword():
     print(searchRes)
     if searchRes == '':
         messagebox.showwarning('키워드가 없습니다','키워드를 입력해주세요!')
+        activeLabel('키워드를 입력해주세요')
     else:
-        driver = webdriver.Chrome(executable_path='./chromedriver', options=options)
+        driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
 
         driver.get('https://search.shopping.naver.com/search/all?query='+searchRes+'&catId='+cateNum)
         titleList=[]
@@ -377,7 +432,8 @@ def relationKeyword():
         
     
         driver.quit()
-    activeLabel('키워드 수집 성공')
+        activeLabel('키워드 수집 성공')
+        messagebox.showinfo('연관 키워드', '데이터수집이 완료되었습니다 엑셀을 확인해주세요')
     
 
 
@@ -390,7 +446,7 @@ pTitle = Label(window, text = '트렌드 키워드 순위 검색기')
 
 textBox = Entry(window, width= 20)
     
-pProgress = Label(window, text= "버전 1.3")
+pProgress = Label(window, text= "버전 1.6")
     
 initBtn = Button(window, text='트렌드 키워드 전체 데이터 수집', command=crawlKeyword)
 searchBtn = Button(window, text='사용자 지정\n키워드 수집', command=searchKeyword, width=10, height=3)
